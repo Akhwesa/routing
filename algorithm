@@ -1,0 +1,328 @@
+import pandas as pd
+import numpy as np
+
+from sklearn.neighbors import BallTree
+from io import StringIO
+import zipfile, math, sys
+
+# Create DataFrame from gtfs_feed
+zf = zipfile.ZipFile('GTFS_FEED_2019.zip')
+#extract needed files
+sh_df = pd.read_csv(zf.open('stops.txt'))
+stop_times = pd.read_csv(zf.open('stop_times.txt'))
+shapes = pd.read_csv(zf.open('shapes.txt'))
+trips = pd.read_csv(zf.open('trips.txt'))
+routes = pd.read_csv(zf.open('routes.txt'))
+fq = pd.read_csv(zf.open('frequencies.txt'))
+
+df = sh_df[['stop_id','stop_lat','stop_lon']]
+temp_df = df
+stop_time_df = stop_times[['trip_id','stop_id','stop_sequence']]
+
+#Setup Balltree using df as reference dataset
+# Use Haversine formula to calculate distance between points on the earth from lat/long
+tree = BallTree(np.deg2rad(df[['stop_lat','stop_lon']].values), metric='haversine')
+
+def closestKnn(df_other1, query_lats1, query_lons1,k):
+    # Find closest stops in reference dataset for each in df_other
+    # use k = 70 for 70 closest stops since their exists 136 routes in the dataset
+    distances, indices = tree.query(np.deg2rad(np.c_[query_lats1, query_lons1]), k)
+    r_km = 6371000 # multiplier to convert to meters (from unit distance)
+    stp_df=[]
+    dis_df=[]
+    for stop_id, d, ind in zip(df_other1['stop_id'], distances, indices):
+        for i, index in enumerate(ind):
+            stp_id = (df['stop_id'][index])
+            stp_df.append(stp_id)
+            dis = f"{d[i] * r_km:.4f}"
+            dis_df.append(dis)
+            stp_dis = list(zip(stp_df, dis_df))
+            stp_dis_df = pd.DataFrame(stp_dis, columns=['stop_id', 'distance']) #gets the stop_id and respective distances
+    return stp_dis_df
+pass
+# Setup distance queries (points for which we want to find nearest neighbors)
+#location points in coordinates
+other_data = """stop_id stop_lat stop_lon
+new -1.3148615924123332 36.8950994914839"""
+# Use StringIO to allow reading of string as CSV
+df_other1 = pd.read_csv(StringIO(other_data), sep = ' ')
+query_lats1 = df_other1['stop_lat']
+query_lons1 = df_other1['stop_lon']
+
+dest_data = """stop_id stop_lat stop_lon
+dest -1.2889065397743864 36.97150731363728"""  # destination points
+df_other2 = pd.read_csv(StringIO(dest_data), sep = ' ')
+query_lats2 = df_other2['stop_lat']
+query_lons2 = df_other2['stop_lon']
+
+try:
+    stp_dis_df2=closestKnn(df_other1,query_lats1,query_lons1, k=70)
+    trips_df1= stop_time_df[stop_time_df.set_index(['stop_id']).index.isin(stp_dis_df2.set_index(['stop_id']).index)]
+    trips_dfc1 = pd.merge(trips_df1, stp_dis_df2, on=['stop_id'], how='left')
+    trips_dfc1 = trips_dfc1.sort_values(by=['distance'], ascending=True)
+
+    stp_dis_df1=closestKnn(df_other1=df_other2,query_lats1=query_lats2, query_lons1=query_lons2,k=70)
+    #cross check for trip_id using stop_id from stop_times.txt
+    trips_df = stop_time_df[stop_time_df.set_index(['stop_id']).index.isin(stp_dis_df1.set_index(['stop_id']).index)]
+    trips_dfc = pd.merge(trips_df, stp_dis_df1, on=['stop_id'], how='left')
+    trips_dfcd = trips_dfc.sort_values(by=['distance'], ascending=True).drop_duplicates(subset='trip_id', keep='first')
+
+    trps = trips_dfc1.merge(trips_dfcd, on='trip_id', how='inner').sort_values(by=['distance_y'], ascending=True)
+    trps['t_distance'] = trps['distance_x'].astype(float) + trps['distance_y'].astype(float)
+    trps = trps[['trip_id', 'stop_id_x', 'distance_x', 'stop_id_y', 'distance_y', 't_distance']]
+    trps1 = trps[trps['t_distance'] == trps['t_distance'].min()]
+    totalDis = trps1['t_distance']
+    temp_trps1 = trps1
+    totalDis = totalDis.values[0]
+    w_distance_x = trps1['distance_x'].astype(float)
+    w_distance_x = w_distance_x.values[0]
+    w_distance_y = trps1['distance_y'].astype(float)
+    w_distance_y = w_distance_y.values[0]
+except:
+    stp_dis_df2=closestKnn(df_other1,query_lats1,query_lons1, k=2150)
+    trips_df1e= stop_time_df[stop_time_df.set_index(['stop_id']).index.isin(stp_dis_df2.set_index(['stop_id']).index)]
+    trips_dfc1e = pd.merge(trips_df1e, stp_dis_df2, on=['stop_id'], how='left')
+    trips_dfc1e = trips_dfc1e.sort_values(by=['distance'], ascending=True).drop_duplicates(subset='trip_id', keep='first')
+
+    stp_dis_df1=closestKnn(df_other1=df_other2,query_lats1=query_lats2, query_lons1=query_lons2,k=2150)
+    #cross check for trip_id using stop_id from stop_times.txt
+    trips_dfe = stop_time_df[stop_time_df.set_index(['stop_id']).index.isin(stp_dis_df1.set_index(['stop_id']).index)]
+    trips_dfce = pd.merge(trips_dfe, stp_dis_df1, on=['stop_id'], how='left')
+    trips_dfcde = trips_dfce.sort_values(by=['distance'], ascending=True).drop_duplicates(subset='trip_id', keep='first')
+
+    trps = trips_dfc1e.merge(trips_dfcde, on='trip_id', how='inner').sort_values(by=['distance_y'], ascending=True)
+    trps['t_distance'] = trps['distance_x'].astype(float) + trps['distance_y'].astype(float)
+    trps = trps[['trip_id', 'stop_id_x', 'distance_x', 'stop_id_y', 'distance_y', 't_distance']]
+    trps1 = trps[trps['t_distance']==trps['t_distance'].min()]
+    totalDis = trps1['t_distance']
+    temp_trps1=trps1
+    totalDis = totalDis.values[0]
+    w_distance_x = trps1['distance_x'].astype(float)
+    w_distance_x = w_distance_x.values[0]
+    w_distance_y = trps1['distance_y'].astype(float)
+    w_distance_y = w_distance_y.values[0]
+    stop_id_y =trps1['stop_id_y']
+    stop_id_y = stop_id_y.values[0]
+    stop_id_x = trps1['stop_id_x']
+    stop_id_x = stop_id_x.values[0]
+def to_town():
+    # get cbd as central point
+    tao = """stop_id stop_lat stop_lon
+    dest -1.2855300409249406 36.826278115418816"""  # destination points
+    df_other3 = pd.read_csv(StringIO(tao), sep=' ')
+    query_lats3 = df_other3['stop_lat']
+    query_lons3 = df_other3['stop_lon']
+
+    stp_dis_df3 = closestKnn(df_other1=df_other3, query_lats1=query_lats3, query_lons1=query_lons3, k=70)
+    trips_df3 = stop_time_df[stop_time_df.set_index(['stop_id']).index.isin(stp_dis_df3.set_index(['stop_id']).index)]
+    trips_dfc4 = pd.merge(trips_df3, stp_dis_df3, on=['stop_id'], how='left')
+    trips_dfc4 = trips_dfc4.sort_values(by=['distance'], ascending=True).drop_duplicates(subset='trip_id', keep='first')
+    return trips_dfc4
+
+if totalDis>=1500 and w_distance_x>=1000 and w_distance_y>=1000:
+    twn_trips = to_town()
+    trps_tw = trips_dfc1.merge(twn_trips, on='trip_id', how='inner').sort_values(by=['distance_y'], ascending=True)
+    trps_tw['t_distance'] = trps_tw['distance_x'].astype(float) + trps_tw['distance_y'].astype(float)
+    trps_tw = trps_tw[['trip_id', 'stop_id_x', 'distance_x', 'stop_id_y', 'distance_y', 't_distance']]
+    trps1t = trps_tw[trps_tw['t_distance'] == trps_tw['t_distance'].min()]
+    totalDis_t = trps1t['t_distance']
+    w_distance_xt = trps1t['distance_x'].astype(float)
+    w_distance_xt = w_distance_xt.values[0]
+    w_distance_yt = trps1t['distance_y'].astype(float)
+    w_distance_yt = w_distance_yt.values[0]
+    depart_ptt = trps1t.iat[0, 1]
+    stage1t = sh_df[sh_df.values == depart_ptt]
+    sg1t = stage1t.iat[0, 1]
+    arrival_ptt = trps1t.iat[0, 3]
+    stage2t = sh_df[sh_df.values == arrival_ptt]
+    sg2t = stage2t.iat[0, 1]
+    trip_idt = trps1t.iat[0, 0]
+    trp_rtt = trips[trips.values == trip_idt]
+    rt_idt = trp_rtt.iat[0, 0]
+    rtt = routes[routes.values == rt_idt]
+    rt_name_t = rtt.iat[0, 3]
+    mat_no_t = rtt.iat[0, 2]
+
+    twn_trips2 = to_town()
+    trps_tw1 = twn_trips2.merge(trips_dfcd, on='trip_id', how='inner').sort_values(by=['distance_y'], ascending=True)
+    trps_tw1['t_distance'] = trps_tw1['distance_x'].astype(float) + trps_tw1['distance_y'].astype(float)
+    trps_tw1 = trps_tw1[['trip_id', 'stop_id_x', 'distance_x', 'stop_id_y', 'distance_y', 't_distance']]
+    trps1w = trps_tw1[trps_tw1['t_distance'] == trps_tw1['t_distance'].min()]
+    totalDis_w = trps1w['t_distance']
+    w_distance_xw = trps1w['distance_x'].astype(float)
+    w_distance_xw = w_distance_xw.values[0]
+    w_distance_yw = trps1w['distance_y'].astype(float)
+    w_distance_yw = w_distance_yw.values[0]
+    depart_ptw = trps1w.iat[0, 1]
+    stage1w = sh_df[sh_df.values == depart_ptw]
+    sg1w = stage1w.iat[0, 1]
+    arrival_ptw = trps1w.iat[0, 3]
+    stage2w = sh_df[sh_df.values == arrival_ptw]
+    sg2w = stage2w.iat[0, 1]
+    trip_idw = trps1w.iat[0, 0]
+    trp_rtw = trips[trips.values == trip_idw]
+    rt_idw = trp_rtw.iat[0, 0]
+    rtw = routes[routes.values == rt_idw]
+    rt_name_w = rtw.iat[0, 3]
+    mat_no_w = rtw.iat[0, 2]
+    print('Walk for ', w_distance_xt, 'mtrs', ' to ', sg1t, 'stage,\n', 'Board Bus No', mat_no_t, 'using', rt_name_t,
+          'route,\n', 'Your next drop off will be', sg2t, 'stage,')
+    print('\nGo to ', sg1w, 'stage,\n', 'Board Bus No', mat_no_w, 'using', rt_name_w,
+          'route,\n', 'and Your final drop off will be', sg2w, 'stage,',
+          '\ntotal walking distance from current location to destination is\n',temp_trps1 , 'meters.')
+
+elif totalDis>=1100 and w_distance_x>=1000:
+    trps_x = trps1[['stop_id_x', 'distance_x']]  # stop_id_y for destination
+    trps_x1 = temp_df[temp_df.set_index(['stop_id']).index.isin(trps_x.set_index(['stop_id_x']).index)]
+    # trps_y1 with stop_id_x becomes the new depature
+    df_other6 = trps_x1
+    query_lats6 = df_other6['stop_lat']
+    query_lons6 = df_other6['stop_lon']
+
+    stp_dis_df6 = closestKnn(df_other1=df_other6, query_lats1=query_lats6, query_lons1=query_lons6, k=70)
+    # cross check for trip_id using stop_id from stop_times.txt
+    trips_df6 = stop_time_df[stop_time_df.set_index(['stop_id']).index.isin(stp_dis_df6.set_index(['stop_id']).index)]
+    trips_dfc6 = pd.merge(trips_df6, stp_dis_df6, on=['stop_id'], how='left')
+    trips_dfcd6 = trips_dfc6.sort_values(by=['distance'], ascending=True)
+    # cross check with destination trips_dfcd
+    trpb6 = trips_dfcd6.merge(trips_dfc1, on='trip_id', how='inner').sort_values(by=['distance_y'], ascending=True)
+    trpb6['t_distance'] = trpb6['distance_x'].astype(float) + trpb6['distance_y'].astype(float)
+    trpb6 = trpb6[['trip_id', 'stop_id_x', 'distance_x', 'stop_id_y', 'distance_y', 't_distance']]
+    trp6 = trpb6[trpb6['t_distance'] == trpb6['t_distance'].min()]
+
+    stop_id_y6 = trp6['stop_id_y']
+    stop_id_y6 = stop_id_y6.values[0]
+    stop_id_x6 = trp6['stop_id_x']
+    stop_id_x6 = stop_id_x6.values[0]
+
+    depart_pt = trps1.iat[0, 1]
+    stage1 = sh_df[sh_df.values == depart_pt]
+    sg1 = stage1.iat[0, 1]
+    arrival_pt = trps1.iat[0, 3]
+    stage2 = sh_df[sh_df.values == arrival_pt]
+    sg2 = stage2.iat[0, 1]
+    trip_id = trps1.iat[0, 0]
+    trp_rt = trips[trips.values == trip_id]
+    rt_id = trp_rt.iat[0, 0]
+    rt = routes[routes.values == rt_id]
+    rt_name = rt.iat[0, 3]
+    mat_no = rt.iat[0, 2]
+    if stop_id_y6 == stop_id_x6:
+
+        print('Walk for ', w_distance_x, 'mtrs', ' to ', sg1, 'stage,\n', 'Board Bus No', mat_no, 'using',
+              rt_name, 'route,\n', 'Your next drop off will be', sg2, 'stage,\nstop_id_y remains the same\n', trps1,
+              '\n', trp6)
+    else:
+        depart_pt6 = trp6.iat[0, 1]
+        stage6a = sh_df[sh_df.values == depart_pt6]
+        sg6a = stage6a.iat[0, 1]
+        arrival_pt6 = trp6.iat[0, 3]
+        stage6 = sh_df[sh_df.values == arrival_pt6]
+        sg6 = stage6.iat[0, 1]
+        trip_id6 = trp6.iat[0, 0]
+        trp_rt6 = trips[trips.values == trip_id6]
+        rt_id6 = trp_rt6.iat[0, 0]
+        rt6 = routes[routes.values == rt_id6]
+        rt_name6 = rt6.iat[0, 3]
+        mat_no6 = rt6.iat[0, 2]
+        print('Walk for ', w_distance_x, 'mtrs', ' to ', sg1, 'stage,\n', 'Board Bus No', mat_no, 'using',
+              rt_name,
+              'route,\n', 'Your next drop off will be', sg2, 'stage,')
+        print('\nGo to ', sg6a, 'stage,\n', 'Board Bus No', mat_no6, 'using', rt_name6,
+              'route,\n', 'and Your final drop off will be', sg6, 'stage,',
+              '\ntotal walking distance from current location to destination is', 'meters.')
+elif totalDis>=1100 and w_distance_y>=1000 :
+    trps_y = trps1[['stop_id_y', 'distance_y']]#stop_id_y for destination
+    trps_y1 = temp_df[temp_df.set_index(['stop_id']).index.isin(trps_y.set_index(['stop_id_y']).index)]
+    #trps_y1 with stop_id_x becomes the new depature
+    df_other5 = trps_y1
+    query_lats5 = df_other5['stop_lat']
+    query_lons5 = df_other5['stop_lon']
+
+    stp_dis_df5 = closestKnn(df_other1=df_other5, query_lats1=query_lats5, query_lons1=query_lons5, k=70)
+    # cross check for trip_id using stop_id from stop_times.txt
+    trips_df5 = stop_time_df[stop_time_df.set_index(['stop_id']).index.isin(stp_dis_df5.set_index(['stop_id']).index)]
+    trips_dfc5 = pd.merge(trips_df5, stp_dis_df5, on=['stop_id'], how='left')
+    trips_dfcd5 = trips_dfc5.sort_values(by=['distance'], ascending=True)#.drop_duplicates(subset='trip_id', keep='first')
+    #cross check with destination trips_dfcd
+    trpb5 = trips_dfcd5.merge(trips_dfcd, on='trip_id', how='inner').sort_values(by=['distance_y'], ascending=True)
+    trpb5['t_distance'] = trpb5['distance_x'].astype(float) + trpb5['distance_y'].astype(float)
+    trpb5 = trpb5[['trip_id', 'stop_id_x', 'distance_x', 'stop_id_y', 'distance_y', 't_distance']]
+    trp5 = trpb5[trpb5['t_distance'] == trpb5['t_distance'].min()]
+
+    stop_id_y5 = trp5['stop_id_y']
+    stop_id_y5 = stop_id_y5.values[0]
+    stop_id_x5 = trp5['stop_id_x']
+    stop_id_x5 = stop_id_x5.values[0]
+
+    depart_pt = trps1.iat[0, 1]
+    stage1 = sh_df[sh_df.values == depart_pt]
+    sg1 = stage1.iat[0, 1]
+    arrival_pt = trps1.iat[0, 3]
+    stage2 = sh_df[sh_df.values == arrival_pt]
+    sg2 = stage2.iat[0, 1]
+    trip_id = trps1.iat[0, 0]
+    trp_rt = trips[trips.values == trip_id]
+    rt_id = trp_rt.iat[0, 0]
+    rt = routes[routes.values == rt_id]
+    rt_name = rt.iat[0, 3]
+    mat_no = rt.iat[0, 2]
+    if stop_id_y5 == stop_id_x5:
+
+        print('Walk for ', w_distance_x, 'mtrs', ' to ', sg1, 'stage,\n', 'Board Bus No', mat_no, 'using',
+              rt_name, 'route,\n', 'Your next drop off will be', sg2,
+              'stage,\nstop_id_y remains the same\n', trps1,'\n', trp5)
+    else:
+        depart_pt5 = trp5.iat[0, 1]
+        stage5a = sh_df[sh_df.values == depart_pt5]
+        sg5a = stage5a.iat[0, 1]
+        arrival_pt5 = trp5.iat[0, 3]
+        stage5 = sh_df[sh_df.values == arrival_pt5]
+        sg5 = stage5.iat[0, 1]
+        trip_id5 = trp5.iat[0, 0]
+        trp_rt5 = trips[trips.values == trip_id5]
+        rt_id5 = trp_rt5.iat[0, 0]
+        rt5 = routes[routes.values == rt_id5]
+        rt_name5 = rt5.iat[0, 3]
+        mat_no5 = rt5.iat[0, 2]
+        print('Walk for ', w_distance_x, 'mtrs', ' to ', sg1, 'stage,\n', 'Board Bus No', mat_no, 'using',
+              rt_name,
+              'route,\n', 'Your next drop off will be', sg2, 'stage,')
+        print('\nGo to ', sg5a, 'stage,\n', 'Board Bus No', mat_no5, 'using', rt_name5,
+              'route,\n', 'and Your final drop off will be', sg5, 'stage,',
+              '\ntotal walking distance from current location to destination is', 'meters.')
+else:
+    stop_id_y = trps1['stop_id_y']
+    stop_id_y = stop_id_y.values[0]
+    stop_id_x = trps1['stop_id_x']
+    stop_id_x = stop_id_x.values[0]
+    if stop_id_y==stop_id_x:
+        print('trip is too close, just walk\n',trps1)
+    else:
+        depart_pt = trps1.iat[0,1]
+        stage1 = sh_df[sh_df.values==depart_pt]
+        sg1 = stage1.iat[0, 1]
+        arrival_pt = trps1.iat[0, 3]
+        stage2 = sh_df[sh_df.values == arrival_pt]
+        sg2 = stage2.iat[0, 1]
+        trip_id = trps1.iat[0, 0]
+        trp_rt = trips[trips.values==trip_id]
+        rt_id = trp_rt.iat[0, 0]
+        rt = routes[routes.values==rt_id]
+        rt_name = rt.iat[0, 3]
+        mat_no = rt.iat[0, 2]
+        print('Walk for ',w_distance_x,'mtrs',' to ',sg1,trps1,'stage,\n',
+              'Board Bus No',mat_no,'using',rt_name, 'route,\n','Your next drop off will be',sg2,'stage,',
+              '\ntotal walking distance from current location to destination is\n', totalDis, 'meters.')
+
+#Umoja --> -1.2858143069958488 36.89552028737499
+#westy --> -1.2595738624436619 36.77717961209831
+#kasarani-Mwiki -> -1.2188927313203912 36.899692024939945
+#kangemi --> -1.2662895749949041 36.75069574381603
+#Buru -> -1.28797555000001 36.88334477
+#kibera --> -1.306564177425369 36.78654820545046
+#Adams --> -1.3005505638995285 36.779867688264545
+#Utawala --> -1.2889065397743864 36.97150731363728
+#kariobangi --> -1.2611918874083554 36.88020846121156
+#fedha estate --> -1.3148615924123332 36.8950994914839
+#near Archieve --> -1.2855300409249406 36.826278115418816
