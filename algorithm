@@ -1,9 +1,9 @@
 import pandas as pd
 import numpy as np
-
+import tkinter
 from sklearn.neighbors import BallTree
 from io import StringIO
-import zipfile, math, sys
+import zipfile, math, sys, tkintermapview
 
 # Create DataFrame from gtfs_feed
 zf = zipfile.ZipFile('GTFS_FEED_2019.zip')
@@ -13,7 +13,7 @@ stop_times = pd.read_csv(zf.open('stop_times.txt'))
 shapes = pd.read_csv(zf.open('shapes.txt'))
 trips = pd.read_csv(zf.open('trips.txt'))
 routes = pd.read_csv(zf.open('routes.txt'))
-fq = pd.read_csv(zf.open('frequencies.txt'))
+
 
 df = sh_df[['stop_id','stop_lat','stop_lon']]
 temp_df = df
@@ -43,14 +43,14 @@ pass
 # Setup distance queries (points for which we want to find nearest neighbors)
 #location points in coordinates
 other_data = """stop_id stop_lat stop_lon
-new -1.3148615924123332 36.8950994914839"""
+fedha estate -1.3148615924123332 36.8950994914839"""
 # Use StringIO to allow reading of string as CSV
 df_other1 = pd.read_csv(StringIO(other_data), sep = ' ')
 query_lats1 = df_other1['stop_lat']
 query_lons1 = df_other1['stop_lon']
 
 dest_data = """stop_id stop_lat stop_lon
-dest -1.2889065397743864 36.97150731363728"""  # destination points
+Umoja -1.2858143069958488 36.89552028737499"""  # destination points
 df_other2 = pd.read_csv(StringIO(dest_data), sep = ' ')
 query_lats2 = df_other2['stop_lat']
 query_lons2 = df_other2['stop_lon']
@@ -117,7 +117,7 @@ def to_town():
     trips_df3 = stop_time_df[stop_time_df.set_index(['stop_id']).index.isin(stp_dis_df3.set_index(['stop_id']).index)]
     trips_dfc4 = pd.merge(trips_df3, stp_dis_df3, on=['stop_id'], how='left')
     trips_dfc4 = trips_dfc4.sort_values(by=['distance'], ascending=True).drop_duplicates(subset='trip_id', keep='first')
-    return trips_dfc4
+    return trips_dfc4 #returns trips and distance from cbd
 
 if totalDis>=1500 and w_distance_x>=1000 and w_distance_y>=1000:
     twn_trips = to_town()
@@ -165,14 +165,16 @@ if totalDis>=1500 and w_distance_x>=1000 and w_distance_y>=1000:
     rtw = routes[routes.values == rt_idw]
     rt_name_w = rtw.iat[0, 3]
     mat_no_w = rtw.iat[0, 2]
-    print('Walk for ', w_distance_xt, 'mtrs', ' to ', sg1t, 'stage,\n', 'Board Bus No', mat_no_t, 'using', rt_name_t,
+    t_dis = w_distance_xt + w_distance_xw + w_distance_yw
+
+    print('\n Walk for ', str(round(w_distance_xt,2)), 'mtrs', ' to ', sg1t, 'stage,\n', 'Board Bus No', mat_no_t, 'using', rt_name_t,
           'route,\n', 'Your next drop off will be', sg2t, 'stage,')
-    print('\nGo to ', sg1w, 'stage,\n', 'Board Bus No', mat_no_w, 'using', rt_name_w,
-          'route,\n', 'and Your final drop off will be', sg2w, 'stage,',
-          '\ntotal walking distance from current location to destination is\n',temp_trps1 , 'meters.')
+    print('\n Go to ', sg1w, 'stage,','a distance of',str(round(w_distance_xw,2)),'from drop off\n', 'And Board Bus No', mat_no_w, 'using', rt_name_w,
+          'route,\n', 'Your final drop off will be', sg2w, 'stage,',
+          '\n total walking distance from current location to destination is\n',str(round(t_dis,2)) , 'meters.lp1' )
 
 elif totalDis>=1100 and w_distance_x>=1000:
-    trps_x = trps1[['stop_id_x', 'distance_x']]  # stop_id_y for destination
+    trps_x = trps1[['stop_id_x', 'distance_x']]  # stop_id_x for destination
     trps_x1 = temp_df[temp_df.set_index(['stop_id']).index.isin(trps_x.set_index(['stop_id_x']).index)]
     # trps_y1 with stop_id_x becomes the new depature
     df_other6 = trps_x1
@@ -194,6 +196,10 @@ elif totalDis>=1100 and w_distance_x>=1000:
     stop_id_y6 = stop_id_y6.values[0]
     stop_id_x6 = trp6['stop_id_x']
     stop_id_x6 = stop_id_x6.values[0]
+    w_distance_y6 = trp6['distance_y'].astype(float)
+    w_distance_y6 = w_distance_y6.values[0]
+    w_distance_x6 = trp6['distance_x'].astype(float)
+    w_distance_x6 = w_distance_x6.values[0]
 
     depart_pt = trps1.iat[0, 1]
     stage1 = sh_df[sh_df.values == depart_pt]
@@ -208,14 +214,15 @@ elif totalDis>=1100 and w_distance_x>=1000:
     rt_name = rt.iat[0, 3]
     mat_no = rt.iat[0, 2]
     if stop_id_y6 == stop_id_x6:
-
+        t_dis6 = w_distance_y + w_distance_x
         print('Walk for ', w_distance_x, 'mtrs', ' to ', sg1, 'stage,\n', 'Board Bus No', mat_no, 'using',
-              rt_name, 'route,\n', 'Your next drop off will be', sg2, 'stage,\nstop_id_y remains the same\n', trps1,
-              '\n', trp6)
+              rt_name, 'route,\n', 'Your next drop off will be', sg2, 'stage,\nstop_id_y remains the same\n', 'total distance remains',
+              str(round(t_dis6)),'mtrs')
     else:
         depart_pt6 = trp6.iat[0, 1]
         stage6a = sh_df[sh_df.values == depart_pt6]
         sg6a = stage6a.iat[0, 1]
+
         arrival_pt6 = trp6.iat[0, 3]
         stage6 = sh_df[sh_df.values == arrival_pt6]
         sg6 = stage6.iat[0, 1]
@@ -225,12 +232,15 @@ elif totalDis>=1100 and w_distance_x>=1000:
         rt6 = routes[routes.values == rt_id6]
         rt_name6 = rt6.iat[0, 3]
         mat_no6 = rt6.iat[0, 2]
-        print('Walk for ', w_distance_x, 'mtrs', ' to ', sg1, 'stage,\n', 'Board Bus No', mat_no, 'using',
-              rt_name,
-              'route,\n', 'Your next drop off will be', sg2, 'stage,')
-        print('\nGo to ', sg6a, 'stage,\n', 'Board Bus No', mat_no6, 'using', rt_name6,
-              'route,\n', 'and Your final drop off will be', sg6, 'stage,',
-              '\ntotal walking distance from current location to destination is', 'meters.')
+
+        t_dis6 = w_distance_y6 + w_distance_x6 + w_distance_y
+
+        print('\n Walk for ', str(round(w_distance_y6)), 'mtrs', ' to ', sg6, 'stage,\n', 'Board Bus No', mat_no6, 'using',
+              rt_name6,
+              'route,\n', 'Your next drop off will be', sg1, 'stage,')
+        print('\n At ', sg6a, 'stage,\n', 'Board Bus No', mat_no, 'using', rt_name,
+              'route,\n', 'and Your final drop off will be', sg2, 'stage,',
+              '\ntotal walking distance from current location to destination is', str(round(t_dis6)), 'meters.lp2')
 elif totalDis>=1100 and w_distance_y>=1000 :
     trps_y = trps1[['stop_id_y', 'distance_y']]#stop_id_y for destination
     trps_y1 = temp_df[temp_df.set_index(['stop_id']).index.isin(trps_y.set_index(['stop_id_y']).index)]
@@ -254,6 +264,10 @@ elif totalDis>=1100 and w_distance_y>=1000 :
     stop_id_y5 = stop_id_y5.values[0]
     stop_id_x5 = trp5['stop_id_x']
     stop_id_x5 = stop_id_x5.values[0]
+    w_distance_y5 = trp5['distance_y'].astype(float)
+    w_distance_y5 = w_distance_y5.values[0]
+    w_distance_x5 = trp5['distance_x'].astype(float)
+    w_distance_x5 = w_distance_x5.values[0]
 
     depart_pt = trps1.iat[0, 1]
     stage1 = sh_df[sh_df.values == depart_pt]
@@ -268,10 +282,10 @@ elif totalDis>=1100 and w_distance_y>=1000 :
     rt_name = rt.iat[0, 3]
     mat_no = rt.iat[0, 2]
     if stop_id_y5 == stop_id_x5:
-
+        t_dis5 = w_distance_y + w_distance_x
         print('Walk for ', w_distance_x, 'mtrs', ' to ', sg1, 'stage,\n', 'Board Bus No', mat_no, 'using',
               rt_name, 'route,\n', 'Your next drop off will be', sg2,
-              'stage,\nstop_id_y remains the same\n', trps1,'\n', trp5)
+              'stage,\nstop_id_y remains the same\n total walking distances is', str(round(t_dis5)),'mtrs')
     else:
         depart_pt5 = trp5.iat[0, 1]
         stage5a = sh_df[sh_df.values == depart_pt5]
@@ -285,12 +299,13 @@ elif totalDis>=1100 and w_distance_y>=1000 :
         rt5 = routes[routes.values == rt_id5]
         rt_name5 = rt5.iat[0, 3]
         mat_no5 = rt5.iat[0, 2]
+        t_dis6 = w_distance_y5 + w_distance_x5 + w_distance_x
         print('Walk for ', w_distance_x, 'mtrs', ' to ', sg1, 'stage,\n', 'Board Bus No', mat_no, 'using',
               rt_name,
               'route,\n', 'Your next drop off will be', sg2, 'stage,')
         print('\nGo to ', sg5a, 'stage,\n', 'Board Bus No', mat_no5, 'using', rt_name5,
               'route,\n', 'and Your final drop off will be', sg5, 'stage,',
-              '\ntotal walking distance from current location to destination is', 'meters.')
+              '\ntotal walking distance from current location to destination is',str(round(t_dis6)), 'meters.lp3')
 else:
     stop_id_y = trps1['stop_id_y']
     stop_id_y = stop_id_y.values[0]
@@ -313,16 +328,16 @@ else:
         mat_no = rt.iat[0, 2]
         print('Walk for ',w_distance_x,'mtrs',' to ',sg1,trps1,'stage,\n',
               'Board Bus No',mat_no,'using',rt_name, 'route,\n','Your next drop off will be',sg2,'stage,',
-              '\ntotal walking distance from current location to destination is\n', totalDis, 'meters.')
+              '\ntotal walking distance from current location to destination is\n', totalDis, 'meters.lp0')
 
-#Umoja --> -1.2858143069958488 36.89552028737499
-#westy --> -1.2595738624436619 36.77717961209831
-#kasarani-Mwiki -> -1.2188927313203912 36.899692024939945
-#kangemi --> -1.2662895749949041 36.75069574381603
-#Buru -> -1.28797555000001 36.88334477
-#kibera --> -1.306564177425369 36.78654820545046
-#Adams --> -1.3005505638995285 36.779867688264545
-#Utawala --> -1.2889065397743864 36.97150731363728
-#kariobangi --> -1.2611918874083554 36.88020846121156
-#fedha estate --> -1.3148615924123332 36.8950994914839
-#near Archieve --> -1.2855300409249406 36.826278115418816
+# Umoja -1.2858143069958488 36.89552028737499
+# westy -1.2595738624436619 36.77717961209831
+# kasarani_Mwiki -1.2188927313203912 36.899692024939945
+# kangemi -1.2662895749949041 36.75069574381603
+# Buru -1.28797555000001 36.88334477
+# kibera -1.306564177425369 36.78654820545046
+# Adams -1.3005505638995285 36.779867688264545
+# Utawala -1.2889065397743864 36.97150731363728
+# kariobangi -1.2611918874083554 36.88020846121156
+# fedha estate -1.3148615924123332 36.8950994914839
+# near Archieve -1.2855300409249406 36.826278115418816
