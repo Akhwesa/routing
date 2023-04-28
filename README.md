@@ -3,6 +3,7 @@
 Milestone 1 - Understand the problem. Understand how the problem will be solved.
 
 This project sets to solve a route-planning algorithm in public transit for optimizing the most convenient route to use by suggesting the appropriate Matatu terminal or stage. This is achieved by taking the current location and final destination coordinates of the user to solve the shortest path problem algorithm. While the inputted coordinates may not be part of the route nodes, it is imperative to solve for the most convenient terminal by considering the weight of the trips and distance between the current location and the pick-up terminal or stage as well as the distance between the final destination and drop-off terminal. The weight of the trip could be the distance, cost, time and capacity of a specific route.
+
 Milestone 1 – Data. Explain the Source and attributes
 
  This project is carried out using GTFS static data, which is the most common standardized format for public transit schedules and geographic information. GTFS was created in 2005 for transit agencies to describe their schedules, trips, routes, and stops data in an open-source format that can be used for Google Transit Web-based trip planner. The GTFS .zip file downloaded from Digital Matatu website contains 10 text files that form a database-like structure with every file as one table, and can import these CSV files directly into our program to run queries on them.
