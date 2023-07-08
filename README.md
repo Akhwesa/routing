@@ -1,17 +1,17 @@
 # routing
 
-Milestone 1 - Understand the problem. Understand how the problem will be solved.
+# Milestone 1 - Understand the problem. Understand how the problem will be solved.
 
 This project sets to solve a route-planning algorithm in public transit for optimizing the most convenient route to use by suggesting the appropriate Matatu terminal or stage. This is achieved by taking the current location and final destination coordinates of the user to solve the shortest path problem algorithm. While the inputted coordinates may not be part of the route nodes, it is imperative to solve for the most convenient terminal by considering the weight of the trips and distance between the current location and the pick-up terminal or stage as well as the distance between the final destination and drop-off terminal. The weight of the trip could be the distance, cost, time and capacity of a specific route.
 
-Milestone 1 – Data. Explain the Source and attributes
+# Milestone 1 – Data. Explain the Source and attributes
 
  This project is carried out using GTFS static data, which is the most common standardized format for public transit schedules and geographic information. GTFS was created in 2005 for transit agencies to describe their schedules, trips, routes, and stops data in an open-source format that can be used for Google Transit Web-based trip planner. The GTFS .zip file downloaded from Digital Matatu website contains 10 text files that form a database-like structure with every file as one table, and can import these CSV files directly into our program to run queries on them.
 In routes.txt file, a path on which public transport vehicles travel are defined on a route_short_name and route_long_name column using a route_id. A route is provided by a public transport agency (defined in agencies.txt), and can be serviced once or more times in a day. Every trip on a route is defined with a route_id, service_id, trip_id, trip_headsign, direction_id, and shape_id columns respectively in the trips.txt file. While the shape.txt and frequencies.txt are optional requirement, it provides the rules for mapping vehicle travel paths.
  The stops made during a trip are also defined as stop times in stop_times.txt. A stop time does not contain information about the stop itself: it only links a trip to a stop, and includes some additional information such as the time of arrival and departure. Stops itself are defined in the stops.txt file, including information such as their name, location coordinates and entrances.
  calendar.txt, calender_dates.txt and feed_info.txt are conditionally required meaning the field or file is required under certain conditions like exceptions for the services defined in the calender.txt, which is the service dates specified using a weekly schedule with start and end dates. If calendar.txt is omitted, then calendar_dates.txt is required and must contain all dates of service. 
 
-Milestone 2 – Machine Learning to be used.
+# Milestone 2 – Machine Learning to be used.
 
 When finding the most convenient bus stops based on the current location of the user, I first searched for the “k” most nearest neighboring stops in the dataset to the current location (k = no. of stops). Likewise on the destination side, we use the same K Nearest Neighbor algorithm to get the closest bus stops to the user’s destination while including their differences in walking distance.
 In this algorithm, finding closest similar points is a core-deciding factor on where the user will either depart or arrive at by finding the great-circle distance between two points on a sphere given their longitudes and latitudes using the Haversine formula.   
@@ -50,8 +50,8 @@ for stop_id, d, ind in zip(df_other1['stop_id'], distances, indices):
 With this information, we can therefore run another query on the stop_times.txt to associate each stop_id with its corresponding trip_id and stop_sequence. 
 
 
-Algorithm Procedure:
-Step One
+# Algorithm Procedure:
+# Step One
 i.	Import necessary libraries for the program. i.e. pandas, numpy, BallTree from sklearn.neighbor, zipfile and  math 
 ii.	Read current location and destination location in coordinates, store them in a dataframe (df_other)
 iii.	Read stop.txt, stop_times.txt, routes.txt, trips.txt, shapes.txt, frequency.txt file and get stop_id, stop_lat, stop_lon columns only from stop.txt as df.
@@ -83,7 +83,7 @@ Step Five
 i.	If conditions in steps two, three and four and not satisfied then use trps1 from step one to map a single route
 
 
-Milestone 3 – Tools used
+# Milestone 3 – Tools used
 
 Pandas – Makes it simple to do many of the program’s tasks associated with working on data analysis and manipulations, this includes:
 1.	Loading and saving data: Since all the GTFS data are stored in .txt files, pandas allows us to load the files in a 2 Dimension that is rows and columns and save it for analysis later.
@@ -123,7 +123,7 @@ tree = BallTree(np.deg2rad(df[['stop_lat','stop_lon']].values), metric='haversin
 distances, indices = tree.query(np.deg2rad(np.c_[query_lats1, query_lons1]), k)
 
 
-Milestone 5 – Data Processing
+# Milestone 5 – Data Processing
 
 Collection: 
 
@@ -140,14 +140,14 @@ sh_df = pd.read_csv(zf.open('stops.txt'))
 
 Input: The input data can be in the form that may not be machine-readable, so to convert the input data to the readable form we use StringIO modules to allow reading of stings inputs into as csv.
 Output: In this stage, we use tkinker map view to procured results from the algorithm that can be easily inferred by the user.
-Missing Values:  
+# Missing Values:  
 From a validation report generated using the Canonical GTFS Schedule validator , we find out stop_times.txt file is missing a time_points  and shape_dist_traveled columns. Even though they are all optionally required, time_points column indicates if arrival and departure times for a stop are strictly adhered to by the vehicle or if they are instead approximate and/or interpolated times. This field allows a GTFS producer to provide interpolated stop-times, while indicating that the times are approximate. Shape_dist_traveled would have provided the actual distance traveled along the associated shape, from the first stop to the last stop specified in this record
 The data also is missing fare_attribute.txt and fare_rules.txt files. Although they are also optional files, the fare_rules.txt table specifies how fares in fare_attribute.txt apply to an itinerary. That is; Fare depending on origin or destination stations, Fare depending on which zones the itinerary passes through and Fare depending on which route the itinerary uses.
-Inaccurate Values: 
+# Inaccurate Values: 
 Due to luck of time_point column in stop_times.txt file as discussed above both arrival time and departure times are rendered inaccurate and unfit for training the algorithm.
 Other Inaccuracy occurs on feed_info.txt on feed_start_date and feed_end_date columns having expired. Although they are optionally required, the suggested expiration date from the Canonical GTFS Schedule validator is 2023/01/01 the feed end date is 2022/12/31.
 
-Curse of Dimentionality:
+# Curse of Dimentionality:
 K-Nearest Neighbor algorithms perform better with a lower number of features than a large number of features. We can say that when the number of features increases then it requires more data. Increase in dimension also leads to the problem of overfitting. To avoid overfitting, the needed data will need to grow exponentially as it increases the number of dimensions. To avoid the problem of the curse of dimensionality, i performed feature selection approach on the data using exhaustive feature selection techniques.
 Before implementing the techniques, note that noisy and less important data like agency.txt, calender.txt, calender_dates.txt, feed_info.txt and frequency.txt were not necessary to include in the model.
 By trying and making each possible combination like enquiring for a single connecting route, it is possible to pick the best sets. Since there are 136 routes recorded on the dataset, implementing step one (i-Viii) with K = 70;
