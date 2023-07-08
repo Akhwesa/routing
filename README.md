@@ -244,7 +244,7 @@ But what if a person is required to use two or three connecting routes to reach 
  
  The model might also not get matching trips and produce an error.
 Trying to avoid missing a trip in the model we repeat Step One (i-viii) using k=2150 since they’re 4284 stops in stop.txt files to be analyzed, and induce three if else loop conditions to handle the problem of a great walking distance; That is in Step two, three and four.
-Milestone 5 - Training 
+# Milestone 5 - Training 
 Since it is not ideal to use the training dataset for testing the model accuracy and effectiveness while avoiding overfitting and underfitting. Therefore, split up “df” dataset into inputs (X) and target (y). Our input will be every column except ‘trip_id’ because ‘trip_id’ is what we will be attempting to predict. Therefore, ‘trip_id’ will be our target.
 Scikit-learn has a ‘train_test_split’ function from model selection that makes it posibble to split our dataset into training and testing data. Set ‘test_size’ to 0.2 so that 20% of all the data will be used for testing, which leaves 80% of the data as training data for the model to learn from. create a new k-NN classifier model, set ‘n_neighbors’ to 70, algorithm to BallTree and Haversine formula for metrics. Then, using the ‘knn.fit’ function to pass in our training data as parameters to fit our model to the training data.
 from sklearn.model_selection import train_test_split,
